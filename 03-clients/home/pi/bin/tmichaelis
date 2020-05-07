@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+NIC="eth0"
+OLDMAC="$( ethtool -P eth0 | awk '{ print $3; }' )"
+MAC="b8:27:ab:cb:ef:06"
+SERVER="192.168.178.10"
+USER="tmichaelis"
+PASS="ned61"
+
+sudo ip link set dev "${NIC}" down
+sudo ip address flush dev "${NIC}"
+sudo ip route flush  dev "${NIC}"
+sudo ip link set dev "${NIC}" address "${MAC}"
+sudo ip link set dev "${NIC}" up
+sleep 10
+
+cd ~/Documents
+
+ftp -in "${SERVER}" <<EOF
+user "${USER}" "${PASS}"
+get info.txt
+cd files
+put test.txt
+bye
+EOF
+
+sudo ip link set dev "${NIC}" down
+sudo ip address flush dev "${NIC}"
+sudo ip route flush  dev "${NIC}"
+sudo ip link set dev "${NIC}" address "${OLDMAC}"
+sudo ip link set dev "${NIC}" up
+
+logger "$0 executed."
+
+exit 0

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# /etc/cront.d/cronforftp:
+#23 23 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/ftpaspi
+
+SERVER="192.168.178.10"
+USER="pi"
+PASS="GameOfThrones"
+
+cd ~/Documents
+
+ftp -in "${SERVER}" <<EOF
+user "${USER}" "${PASS}"
+get .bash_history
+put test.txt
+bye
+EOF
+
+logger "$0 executed."
+
+exit 0

@@ -1,0 +1,14 @@
+SHELL=/bin/bash
+PATH=/home/pi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 9 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/eguenther
+30 9 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/proche
+0 10 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/pruemmelein
+30 10 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/sguenther
+0 11 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/tmichaelis
+0 12 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/eguenther
+30 12 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/proche
+0 13 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/pruemmelein
+30 13 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/sguenther
+0 14 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/tmichaelis
+23 23 * * * pi perl -e 'sleep int(rand(1800))' && /home/pi/bin/ftpaspi
