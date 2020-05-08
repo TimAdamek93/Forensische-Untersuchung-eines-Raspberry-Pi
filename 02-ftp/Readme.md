@@ -1,15 +1,16 @@
 Raspbian Buster Lite (2020-02-13)
 ---------------------------------
 
-`sudo apt update
+`sudo apt update`
 
-sudo apt full-upgrade
+`sudo apt full-upgrade`
 
-sudo apt autoremove
+`sudo apt autoremove`
 
-sudo apt autoclean
+`sudo apt autoclean`
 
-sudo raspi-config`
+`sudo raspi-config`
+
 (Neustart durchführen!)
 
 cat <<EOF | sudo tee -a /etc/dhcpcd.conf
