@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+# Usage:       ./servant
+#                or
+#              bash servant
+# Description: Open or close a ssh reverse tunnel based on a web page.
+# Author:      Tim Adamek (tim.adamek@polizei.niedersachsen.de)
+# Couthor:     Patrick Neumann (patrick.neumann@polizei.niedersachsen.de)
+# Platform:    Raspbian GNU/Linux 9.x/10.x
+# Version:     1.04
+# Date:        2020-03-18 (first release: 2013-03-06)
+# License:     GPL3
+# Warranty:    This program is distributed WITHOUT ANY WARRANTY
+
+#=== CRONTAB ===================================================================
+# crontab -e
+
+# add (without leading hashtag!):
+#*/1 * * * * /home/pi/bin/servant
+
+#=== CONFIGURATION =============================================================
+readonly USER="evil"
+# PASS bitte setzen!
+readonly PASS=""
+readonly PROTO="https"
+# DOMAIN bitte setzen!
+readonly DOMAIN="localhost.localdomain"
+readonly DIR="cnc"
+readonly FILENAME="servant.php"
+readonly SERIAL="$( awk '/^Serial/ { gsub( "^0*", "", $NF ); print $NF; }' /proc/cpuinfo )"
+readonly MAC="$( cat /sys/class/net/eth0/address | tr -d ":" )"
+readonly ID="$( printf "${SERIAL}${MAC}" | cksum | awk '{ print $1; }' )"
+readonly RPORT="2222"
+readonly RESPONSE="$( curl --silent \
+                           --user "${USER}:${PASS}" \
+                           "${PROTO}://${DOMAIN}/${DIR}/${FILENAME}?id=${ID}" )"
+readonly COMMAND="${RESPONSE%:*}"
+readonly LPORT="${RESPONSE#*:}"
+readonly REVERSESSHTUNNEL="ssh -nNTXY -p ${RPORT} -R :${LPORT}:localhost:22 ${DOMAIN}"
+
+#-------------------------------------------------------------------------------
+# This is the "real magic" of this script...
+#-------------------------------------------------------------------------------
+case "${COMMAND}" in
+
+  open )
+    if ! pgrep -f "${REVERSESSHTUNNEL}" > /dev/null 2>&1 ; then
+      # Place port and user in "~/.ssh/config" before!
+      ${REVERSESSHTUNNEL} &
+      logger "${0} - reverse ssh tunnel opened."
+    fi
+    ;;
+
+  close )
+    if pgrep -f "${REVERSESSHTUNNEL}" > /dev/null 2>&1 ; then
+      # 1st try to interupt
+      pkill -INT -f "${REVERSESSHTUNNEL}"
+      sleep 5
+
+      if pgrep -f "${REVERSESSHTUNNEL}" > /dev/null 2>&1 ; then
+        # if needed: try (harder) to terminate
+        pkill -f "${REVERSESSHTUNNEL}"
+        sleep 5
+
+        if pgrep -f "${REVERSESSHTUNNEL}" > /dev/null 2>&1 ; then
+          # if nothing helps: KILL!
+          pkill -KILL -f "${REVERSESSHTUNNEL}"
+        fi
+
+      fi
+      logger "${0} - reverse ssh tunnel closed."
+    fi
+    ;;
+
+  * )
+    if [ -n "${COMMAND}" ] ; then
+      logger "${0} - command not known."
+    fi
+    ;;
+
+esac
+
+exit 0

