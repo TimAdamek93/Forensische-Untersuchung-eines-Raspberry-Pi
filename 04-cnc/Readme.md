@@ -22,8 +22,9 @@ GRANT ALL PRIVILEGES ON `cnc` . * TO 'master'@'%';
 FLUSH PRIVILEGES;
 (Eigenes Passwort wählen!)
 
-Hinweis auf desec.io (dedyn.io)
-
 Lets Encrypt-Zertifikat erzeugen
 
 sudo systemctl restart apache2.service
+
+
+https://comandandcontrol.dedyn.io/
