@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+certbot --manual --manual-auth-hook ./hook.sh --manual-cleanup-hook ./hook.sh --preferred-challenges dns -d "comandandcontrol.dedyn.io" certonly
+
+exit 0
